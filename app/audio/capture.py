@@ -96,4 +96,9 @@ class AudioCapture:
 
     @property
     def is_running(self) -> bool:
-        return self.stream is not None
+        """Return whether the audio stream is currently active."""
+
+        return bool(
+            self.stream is not None
+            and self.stream.active
+        )
