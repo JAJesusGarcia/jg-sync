@@ -11,11 +11,11 @@
 
 ## v0.2.0 — Audio engine
 
-- [ ] List available audio devices
-- [ ] Select an input device
-- [ ] Capture audio in real time
-- [ ] Display input level
-- [ ] Handle audio device errors
+- [x] List available audio devices
+- [x] Select an input device
+- [x] Capture audio in real time
+- [x] Display input level
+- [x] Handle audio device errors
 
 ## v0.3.0 — BPM detection
 
