@@ -1,0 +1,114 @@
+[1mdiff --git a/scripts/audio_monitor.py b/scripts/audio_monitor.py[m
+[1mindex 7505539..93ff538 100644[m
+[1m--- a/scripts/audio_monitor.py[m
+[1m+++ b/scripts/audio_monitor.py[m
+[36m@@ -1,28 +1,90 @@[m
+[32m+[m[32mfrom __future__ import annotations[m
+[32m+[m
+ import time[m
+ [m
+ from app.audio.capture import AudioCapture[m
+[32m+[m[32mfrom app.audio.devices import get_default_devices, get_input_devices[m
+ [m
+ [m
+ BAR_WIDTH = 40[m
+ [m
+ [m
+ def create_meter(level: float) -> str:[m
+[31m-    level = max(0.0, min(level, 1.0))[m
+[32m+[m[32m    """Create a terminal audio level meter."""[m
+ [m
+[32m+[m[32m    level = max(0.0, min(level, 1.0))[m
+     filled = int(level * BAR_WIDTH)[m
+ [m
+     return "█" * filled + "░" * (BAR_WIDTH - filled)[m
+ [m
+ [m
+[32m+[m[32mdef select_input_device() -> int | None:[m
+[32m+[m[32m    """Let the user select an available audio input device."""[m
+[32m+[m
+[32m+[m[32m    devices = get_input_devices()[m
+[32m+[m[32m    default_input, _ = get_default_devices()[m
+[32m+[m
+[32m+[m[32m    print()[m
+[32m+[m[32m    print("=" * 72)[m
+[32m+[m[32m    print("JG SYNC — INPUT DEVICE")[m
+[32m+[m[32m    print("=" * 72)[m
+[32m+[m[32m    print()[m
+[32m+[m
+[32m+[m[32m    for device in devices:[m
+[32m+[m[32m        default_marker = ([m
+[32m+[m[32m            " [DEFAULT]"[m
+[32m+[m[32m            if device["id"] == default_input[m
+[32m+[m[32m            else ""[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        print([m
+[32m+[m[32m            f"[{device['id']:02}] "[m
+[32m+[m[32m            f"{device['name']} "[m
+[32m+[m[32m            f"({device['host_api']})"[m
+[32m+[m[32m            f"{default_marker}"[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m    print()[m
+[32m+[m[32m    print("Press ENTER to use the default input device.")[m
+[32m+[m
+[32m+[m[32m    while True:[m
+[32m+[m[32m        selection = input("\nInput device ID: ").strip()[m
+[32m+[m
+[32m+[m[32m        if selection == "":[m
+[32m+[m[32m            return default_input[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            device_id = int(selection)[m
+[32m+[m[32m        except ValueError:[m
+[32m+[m[32m            print("Please enter a valid device ID.")[m
+[32m+[m[32m            continue[m
+[32m+[m
+[32m+[m[32m        valid_ids = {[m
+[32m+[m[32m            device["id"][m
+[32m+[m[32m            for device in devices[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        if device_id not in valid_ids:[m
+[32m+[m[32m            print("That device is not a valid audio input.")[m
+[32m+[m[32m            continue[m
+[32m+[m
+[32m+[m[32m        return device_id[m
+[32m+[m
+[32m+[m
+ def main() -> None:[m
+[31m-    capture = AudioCapture()[m
+[32m+[m[32m    device_id = select_input_device()[m
+[32m+[m
+[32m+[m[32m    capture = AudioCapture([m
+[32m+[m[32m        device_id=device_id,[m
+[32m+[m[32m    )[m
+ [m
+     print()[m
+     print("=" * 60)[m
+     print("JG SYNC — AUDIO CAPTURE")[m
+     print("=" * 60)[m
+     print()[m
+[31m-    print("Listening to default input device...")[m
+[32m+[m[32m    print(f"Input device ID: {device_id}")[m
+[32m+[m[32m    print("Listening...")[m
+     print("Press Ctrl+C to stop.")[m
+     print()[m
+ [m
+[36m@@ -31,7 +93,6 @@[m [mdef main() -> None:[m
+ [m
+         while True:[m
+             level = capture.current_level[m
+[31m-[m
+             meter = create_meter(level.peak)[m
+ [m
+             print([m
+[36m@@ -49,7 +110,6 @@[m [mdef main() -> None:[m
+ [m
+     finally:[m
+         capture.stop()[m
+[31m-[m
+         print("Audio capture stopped.")[m
+ [m
+ [m

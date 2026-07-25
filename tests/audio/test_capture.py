@@ -83,7 +83,8 @@ def test_start_capture(mock_input_stream):
 @patch("app.audio.capture.sd.InputStream")
 def test_stop_capture(mock_input_stream):
     stream = MagicMock()
-    self.stream = None
+    stream.active = True
+
     mock_input_stream.return_value = stream
 
     capture = AudioCapture()
@@ -95,4 +96,5 @@ def test_stop_capture(mock_input_stream):
     stream.close.assert_called_once()
 
     assert capture.stream is None
+    assert capture.latest_samples is None
     assert capture.is_running is False

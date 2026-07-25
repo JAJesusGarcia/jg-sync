@@ -32,6 +32,7 @@ class AudioCapture:
         self.channels = channels
 
         self.stream: sd.InputStream | None = None
+        self.latest_samples: np.ndarray | None = None
 
         self.current_level = AudioLevel(
             rms=0.0,
@@ -53,7 +54,16 @@ class AudioCapture:
 
         samples = np.asarray(indata, dtype=np.float32)
 
-        rms = float(np.sqrt(np.mean(np.square(samples))))
+        self.latest_samples = samples.copy()
+
+        rms = float(
+            np.sqrt(
+                np.mean(
+                    np.square(samples)
+                )
+            )
+        )
+
         peak = float(np.max(np.abs(samples)))
 
         if rms > 0:
@@ -92,7 +102,9 @@ class AudioCapture:
 
         self.stream.stop()
         self.stream.close()
+
         self.stream = None
+        self.latest_samples = None
 
     @property
     def is_running(self) -> bool:
