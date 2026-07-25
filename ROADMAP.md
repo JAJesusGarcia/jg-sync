@@ -5,8 +5,8 @@
 - [x] Create GitHub repository
 - [x] Define product identity
 - [x] Create initial project structure
-- [ ] Configure Python environment
-- [ ] Add development dependencies
+- [x] Configure Python environment
+- [x] Add development dependencies
 - [ ] Document local installation
 
 ## v0.2.0 — Audio engine
