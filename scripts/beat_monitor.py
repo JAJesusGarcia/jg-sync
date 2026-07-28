@@ -2,13 +2,15 @@ import time
 
 from app.audio.capture import AudioCapture
 from app.bpm.onset import EnergyOnsetDetector
-from app.bpm.tempo import TempoEstimator
+# from app.bpm.tempo import TempoEstimator
+from app.bpm.tracker import BeatTracker
 
 
 def main() -> None:
     capture = AudioCapture()
     detector = EnergyOnsetDetector()
-    tempo = TempoEstimator()
+    # tempo = TempoEstimator()
+    tracker = BeatTracker()
 
     print()
     print("=" * 68)
@@ -33,27 +35,42 @@ def main() -> None:
 
                 if result.detected:
                     timestamp = time.perf_counter()
-                    tempo_result = tempo.process_beat(timestamp)
+                    # tempo_result = tempo.process_beat(timestamp)
+                    tracking_result = tracker.process_onset(timestamp)
 
-                    if tempo_result.bpm is None:
-                        print(
-                            "● BEAT | "
-                            "BPM: calibrating..."
-                        )
+                    if tracking_result.bpm is None:
+                        bpm_text = "calibrating..."
                     else:
-                        status = (
-                            "ACCEPT"
-                            if tempo_result.accepted
-                            else "REJECT"
-                        )
+                        bpm_text = f"{tracking_result.bpm:6.2f}"
 
-                        print(
-                            f"● BEAT | "
-                            f"BPM: {tempo_result.bpm:6.2f} | "
-                            f"interval: {tempo_result.interval:.3f}s | "
-                            f"samples: {tempo_result.samples} | "
-                            f"{status}"
-                        )
+                    confidence = tracking_result.confidence * 100
+
+                    print(
+                        f"● {tracking_result.state.value:<12}"
+                        f" | BPM: {bpm_text}"
+                        f" | Conf: {confidence:5.1f}%"
+                        f" | {'ACCEPT' if tracking_result.accepted else 'REJECT'}"
+                    )
+
+                    # if tempo_result.bpm is None:
+                    #     print(
+                    #         "● BEAT | "
+                    #         "BPM: calibrating..."
+                    #     )
+                    # else:
+                    #     status = (
+                    #         "ACCEPT"
+                    #         if tempo_result.accepted
+                    #         else "REJECT"
+                    #     )
+
+                    #     print(
+                    #         f"● BEAT | "
+                    #         f"BPM: {tempo_result.bpm:6.2f} | "
+                    #         f"interval: {tempo_result.interval:.3f}s | "
+                    #         f"samples: {tempo_result.samples} | "
+                    #         f"{status}"
+                    #     )
 
             time.sleep(0.005)
 
