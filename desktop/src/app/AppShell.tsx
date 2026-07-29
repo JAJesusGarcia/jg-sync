@@ -1,14 +1,31 @@
 import { Footer } from "../components/layout/Footer";
 import { Header } from "../components/layout/Header";
+import { useEngineStore } from "../store/engine";
 import { Dashboard } from "./Dashboard";
 
 export function AppShell() {
+  const {
+    bpm,
+    confidence,
+    audioLevel,
+    state,
+    beatDetected,
+    connected,
+  } = useEngineStore();
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0B0D10] text-[#F5F7FA]">
       <section className="w-full max-w-3xl px-8 py-12">
-        <Header />
-        <Dashboard />
-        <Footer />
+        <Header state={state} />
+
+        <Dashboard
+          bpm={bpm}
+          confidence={confidence}
+          audioLevel={audioLevel}
+          beatDetected={beatDetected}
+        />
+
+        <Footer connected={connected} />
       </section>
     </main>
   );

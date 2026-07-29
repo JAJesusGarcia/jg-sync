@@ -1,8 +1,4 @@
-type EngineState =
-  | "CALIBRATING"
-  | "TRACKING"
-  | "LOCKED"
-  | "LOST";
+import type { EngineState } from "../../types/engine";
 
 interface StatusBadgeProps {
   state: EngineState;

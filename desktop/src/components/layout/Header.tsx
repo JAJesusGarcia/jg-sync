@@ -1,6 +1,11 @@
+import type { EngineState } from "../../types/engine";
 import { StatusBadge } from "../monitor/StatusBadge";
 
-export function Header() {
+interface HeaderProps {
+  state: EngineState;
+}
+
+export function Header({ state }: HeaderProps) {
   return (
     <header className="flex items-center justify-between border-b border-[#262C36] pb-5">
       <div>
@@ -13,7 +18,7 @@ export function Header() {
         </h1>
       </div>
 
-      <StatusBadge state="CALIBRATING" />
+      <StatusBadge state={state} />
     </header>
   );
 }
