@@ -5,14 +5,15 @@ import sys
 import time
 from pathlib import Path
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+
 from app.audio.capture import AudioCapture  # noqa: E402
-# from app.bpm.onset import EnergyOnsetDetector  # noqa: E402
-from app.bpm.spectral_onset import (
+from app.bpm.spectral_onset import (  # noqa: E402
     SpectralFluxOnsetDetector,
 )
 from app.bpm.tracker import BeatTracker  # noqa: E402
@@ -32,7 +33,12 @@ MIN_DBFS = -60.0
 MAX_DBFS = 0.0
 
 
-def stop_runtime(_signum: int, _frame: object) -> None:
+def stop_runtime(
+    _signum: int,
+    _frame: object,
+) -> None:
+    """Stop the runtime loop gracefully."""
+
     global RUNNING
     RUNNING = False
 
@@ -45,7 +51,10 @@ def dbfs_to_percentage(dbfs: float) -> float:
     0 dBFS represents the maximum digital signal level.
     """
 
-    clamped = min(max(dbfs, MIN_DBFS), MAX_DBFS)
+    clamped = min(
+        max(dbfs, MIN_DBFS),
+        MAX_DBFS,
+    )
 
     return (
         (clamped - MIN_DBFS)
@@ -54,7 +63,9 @@ def dbfs_to_percentage(dbfs: float) -> float:
     )
 
 
-def normalize_engine_state(state_value: str) -> EngineState:
+def normalize_engine_state(
+    state_value: str,
+) -> EngineState:
     """
     Convert the BeatTracker state into the public engine protocol state.
     """
@@ -66,20 +77,27 @@ def normalize_engine_state(state_value: str) -> EngineState:
 
 
 def main() -> int:
-    signal.signal(signal.SIGINT, stop_runtime)
+    signal.signal(
+        signal.SIGINT,
+        stop_runtime,
+    )
 
     if hasattr(signal, "SIGTERM"):
-        signal.signal(signal.SIGTERM, stop_runtime)
+        signal.signal(
+            signal.SIGTERM,
+            stop_runtime,
+        )
 
     capture = AudioCapture()
-    # detector = EnergyOnsetDetector()
+
     detector = SpectralFluxOnsetDetector(
         block_size=capture.block_size,
     )
+
     tracker = BeatTracker()
 
-    last_samples = None
     last_snapshot_time = 0.0
+    last_reported_dropped_blocks = 0
 
     current_bpm = 0.0
     current_confidence = 0.0
@@ -91,67 +109,82 @@ def main() -> int:
         capture.start()
 
         while RUNNING:
-            samples = capture.latest_samples
+            # Drain every currently queued audio block.
+            #
+            # This prevents old blocks from accumulating while the
+            # runtime processes only the newest available input.
+            while True:
+                audio_block = capture.pop_block()
 
-            if samples is not None and samples is not last_samples:
-                onset_result = detector.process(samples)
-                last_samples = samples
+                if audio_block is None:
+                    break
 
-                if onset_result.detected:
-                    onset_timestamp = time.perf_counter()
-                    tracking_result = tracker.process_onset(
-                        onset_timestamp
+                onset_result = detector.process(
+                    audio_block.samples
+                )
+
+                if not onset_result.detected:
+                    continue
+
+                tracking_result = tracker.process_onset(
+                    audio_block.timestamp
+                )
+
+                if tracking_result.interval is None:
+                    print(
+                        (
+                            "onset"
+                            f" | block={audio_block.sequence}"
+                            " | first candidate"
+                        ),
+                        file=sys.stderr,
+                        flush=True,
                     )
-                    # print(
-                    #     f"interval={tracking_result.interval:.3f}"
-                    #     if tracking_result.interval
-                    #     else "first beat",
-                    #     file=sys.stderr,
-                    #     flush=True,
-                    # )
-                    # print(
-                    #     f"candidate BPM={60/tracking_result.interval:.2f}"
-                    #     if tracking_result.interval
-                    #     else "",
-                    #     file=sys.stderr,
-                    #     flush=True,
-                    # )
-                    if tracking_result.interval is None:
-                        print(
-                            "onset | first candidate",
-                            file=sys.stderr,
-                            flush=True,
-                        )
-                    else:
-                        raw_candidate_bpm = (
-                            60.0 / tracking_result.interval
-                        )
-
-                        print(
-                            (
-                                f"onset"
-                                f" | interval={tracking_result.interval:.3f}s"
-                                f" | raw={raw_candidate_bpm:6.2f} BPM"
-                                f" | accepted={tracking_result.accepted}"
-                                f" | state={tracking_result.state.value}"
-                            ),
-                            file=sys.stderr,
-                            flush=True,
-                        )
-
-                    if tracking_result.bpm is not None:
-                        current_bpm = tracking_result.bpm
-
-                    current_confidence = (
-                        tracking_result.confidence * 100.0
+                else:
+                    raw_candidate_bpm = (
+                        60.0
+                        / tracking_result.interval
                     )
 
-                    current_state = normalize_engine_state(
-                        tracking_result.state.value
+                    print(
+                        (
+                            "onset"
+                            f" | block={audio_block.sequence}"
+                            f" | interval="
+                            f"{tracking_result.interval:.6f}s"
+                            f" | raw="
+                            f"{raw_candidate_bpm:7.3f} BPM"
+                            f" | accepted="
+                            f"{tracking_result.accepted}"
+                            f" | state="
+                            f"{tracking_result.state.value}"
+                        ),
+                        file=sys.stderr,
+                        flush=True,
                     )
 
-                    # Only accepted onsets are exposed as actual beats.
-                    pending_beat = tracking_result.accepted
+                if tracking_result.bpm is not None:
+                    current_bpm = (
+                        tracking_result.bpm
+                    )
+
+                current_confidence = (
+                    tracking_result.confidence
+                    * 100.0
+                )
+
+                current_state = normalize_engine_state(
+                    tracking_result.state.value
+                )
+
+                # Preserve a detected beat until the next snapshot.
+                #
+                # Using `or` prevents a later rejected onset from
+                # clearing an accepted beat before it reaches the UI.
+                pending_beat = (
+                    pending_beat
+                    or tracking_result.accepted
+                )
 
             now = time.perf_counter()
 
@@ -176,7 +209,30 @@ def main() -> int:
                 pending_beat = False
                 last_snapshot_time = now
 
-            time.sleep(LOOP_SLEEP_SECONDS)
+            # Report queue overflow only when the count changes.
+            if (
+                capture.dropped_blocks
+                > last_reported_dropped_blocks
+            ):
+                last_reported_dropped_blocks = (
+                    capture.dropped_blocks
+                )
+
+                print(
+                    (
+                        "audio queue warning"
+                        f" | dropped="
+                        f"{capture.dropped_blocks}"
+                        f" | queued="
+                        f"{capture.queued_block_count}"
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                )
+
+            time.sleep(
+                LOOP_SLEEP_SECONDS
+            )
 
     except KeyboardInterrupt:
         pass
@@ -186,6 +242,7 @@ def main() -> int:
             message=str(error),
             code="RUNTIME_FAILURE",
         )
+
         return 1
 
     finally:

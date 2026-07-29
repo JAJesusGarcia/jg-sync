@@ -35,6 +35,7 @@ class BeatTracker:
     Responsibilities:
     - Find a consistent tempo during initial calibration.
     - Prevent the first few noisy onsets from defining the BPM.
+    - Reject duplicate fast onsets.
     - Track confidence.
     - Expose CALIBRATING, TRACKING, LOCKED and LOST states.
     """
@@ -50,16 +51,24 @@ class BeatTracker:
         lost_rejection_limit: int = 10,
     ) -> None:
         if min_bpm <= 0:
-            raise ValueError("min_bpm must be greater than zero")
+            raise ValueError(
+                "min_bpm must be greater than zero"
+            )
 
         if max_bpm <= min_bpm:
-            raise ValueError("max_bpm must be greater than min_bpm")
+            raise ValueError(
+                "max_bpm must be greater than min_bpm"
+            )
 
         if calibration_window < 3:
-            raise ValueError("calibration_window must be at least 3")
+            raise ValueError(
+                "calibration_window must be at least 3"
+            )
 
         if minimum_consensus < 2:
-            raise ValueError("minimum_consensus must be at least 2")
+            raise ValueError(
+                "minimum_consensus must be at least 2"
+            )
 
         if minimum_consensus > calibration_window:
             raise ValueError(
@@ -101,6 +110,9 @@ class BeatTracker:
     ) -> BeatTrackingResult:
         """
         Process an onset timestamp and update the tracking state.
+
+        Duplicate fast onsets are rejected without replacing the
+        previous valid onset timestamp.
         """
 
         if self.last_onset_time is None:
@@ -112,17 +124,28 @@ class BeatTracker:
             )
 
         interval = timestamp - self.last_onset_time
-        self.last_onset_time = timestamp
 
         if interval <= 0:
             return self._reject(interval)
 
-        candidate_bpm = self._normalize_bpm(
-            60.0 / interval
-        )
+        raw_bpm = 60.0 / interval
+
+        # Reject duplicate fast transients.
+        #
+        # We intentionally do not update last_onset_time here.
+        # The next real beat must still be measured from the
+        # previous valid onset.
+        if raw_bpm > self.max_bpm:
+            return self._reject(interval)
+
+        candidate_bpm = self._normalize_bpm(raw_bpm)
 
         if candidate_bpm is None:
             return self._reject(interval)
+
+        # The onset passed the basic temporal validation and can
+        # now become the new tracker reference.
+        self.last_onset_time = timestamp
 
         if self.state in {
             TrackingState.CALIBRATING,
@@ -151,6 +174,9 @@ class BeatTracker:
             self.rejected_count += 1
             self.consecutive_rejections += 1
             self._decrease_confidence()
+
+            if self.confidence < self.lock_threshold:
+                self.state = TrackingState.TRACKING
 
             if (
                 self.consecutive_rejections
@@ -290,19 +316,25 @@ class BeatTracker:
         bpm: float,
     ) -> float | None:
         """
-        Normalize half-time and double-time BPM values into range.
+        Normalize missed-beat intervals without accepting double triggers.
+
+        Slow candidates may represent one or more missed beats and can
+        be doubled into the supported range.
+
+        Fast candidates above max_bpm are rejected because they usually
+        represent duplicate onsets.
         """
 
         if bpm <= 0:
+            return None
+
+        if bpm > self.max_bpm:
             return None
 
         normalized = bpm
 
         while normalized < self.min_bpm:
             normalized *= 2.0
-
-        while normalized > self.max_bpm:
-            normalized /= 2.0
 
         if not self.min_bpm <= normalized <= self.max_bpm:
             return None
@@ -340,6 +372,15 @@ class BeatTracker:
             TrackingState.LOST,
         }:
             self._decrease_confidence()
+
+            if self.confidence < self.lock_threshold:
+                self.state = TrackingState.TRACKING
+
+            if (
+                self.consecutive_rejections
+                >= self.lost_rejection_limit
+            ):
+                self._enter_lost_state()
 
         return self._build_result(
             interval=interval,

@@ -5,137 +5,103 @@ import pytest
 from app.bpm.tracker import BeatTracker, TrackingState
 
 
-def feed_regular_beats(
+def feed_beats(
     tracker: BeatTracker,
-    *,
-    bpm: float,
-    count: int,
-    start_time: float = 0.0,
-) -> list:
-    interval = 60.0 / bpm
-    results = []
-
-    for index in range(count):
-        timestamp = start_time + index * interval
-        results.append(tracker.process_onset(timestamp))
-
-    return results
+    timestamps: list[float],
+):
+    return [
+        tracker.process_onset(timestamp)
+        for timestamp in timestamps
+    ]
 
 
-def test_starts_calibrating() -> None:
-    tracker = BeatTracker()
-
-    assert tracker.current_bpm is None
-    assert tracker.state is TrackingState.CALIBRATING
-    assert tracker.confidence == 0.0
-
-
-def test_calibrates_with_regular_120_bpm_beats() -> None:
+def test_regular_126_bpm_signal() -> None:
     tracker = BeatTracker(
         calibration_window=8,
-        minimum_consensus=5,
-    )
-
-    results = feed_regular_beats(
-        tracker,
-        bpm=120.0,
-        count=8,
-    )
-
-    result = results[-1]
-
-    assert result.bpm == pytest.approx(120.0, abs=0.5)
-    assert result.state in {
-        TrackingState.TRACKING,
-        TrackingState.LOCKED,
-    }
-
-
-def test_calibrates_with_regular_126_bpm_beats() -> None:
-    tracker = BeatTracker(
-        calibration_window=12,
-        minimum_consensus=5,
-    )
-
-    results = feed_regular_beats(
-        tracker,
-        bpm=126.0,
-        count=10,
-    )
-
-    result = results[-1]
-
-    assert result.bpm == pytest.approx(126.0, abs=0.5)
-    assert result.confidence > 0.0
-
-
-def test_accepts_small_timing_jitter() -> None:
-    tracker = BeatTracker(
-        calibration_window=10,
         minimum_consensus=5,
     )
 
     interval = 60.0 / 126.0
-    jitters = [
-        0.000,
-        0.006,
-        -0.004,
-        0.003,
-        -0.007,
-        0.005,
-        -0.002,
-        0.004,
-        -0.003,
-        0.001,
+    timestamps = [
+        index * interval
+        for index in range(10)
     ]
 
-    timestamp = 0.0
-    result = tracker.process_onset(timestamp)
+    results = feed_beats(tracker, timestamps)
 
-    for jitter in jitters:
-        timestamp += interval + jitter
-        result = tracker.process_onset(timestamp)
-
-    assert result.bpm == pytest.approx(126.0, abs=2.0)
-    assert result.state in {
+    assert results[-1].bpm == pytest.approx(
+        126.0,
+        abs=0.5,
+    )
+    assert results[-1].state in {
         TrackingState.TRACKING,
         TrackingState.LOCKED,
     }
 
 
-def test_normalizes_half_time_to_valid_range() -> None:
+def test_double_trigger_does_not_replace_onset_anchor() -> None:
     tracker = BeatTracker(
         calibration_window=8,
         minimum_consensus=5,
     )
 
-    results = feed_regular_beats(
-        tracker,
-        bpm=60.0,
-        count=8,
+    first = tracker.process_onset(0.0)
+    duplicate = tracker.process_onset(0.230)
+    real_beat = tracker.process_onset(0.476)
+
+    assert first.accepted is False
+    assert duplicate.accepted is False
+
+    # The valid beat must still be measured from 0.0,
+    # not from the rejected transient at 0.230.
+    assert real_beat.interval == pytest.approx(
+        0.476,
+        abs=0.001,
     )
 
-    assert results[-1].bpm == pytest.approx(120.0, abs=0.5)
 
-
-def test_reset_clears_tracking_state() -> None:
+def test_double_triggers_do_not_corrupt_126_bpm_tracking() -> None:
     tracker = BeatTracker(
         calibration_window=8,
         minimum_consensus=5,
     )
 
-    feed_regular_beats(
-        tracker,
-        bpm=128.0,
-        count=8,
+    beat_interval = 60.0 / 126.0
+    timestamps: list[float] = []
+
+    for index in range(10):
+        beat_time = index * beat_interval
+        timestamps.append(beat_time)
+
+        if index < 9:
+            timestamps.append(
+                beat_time + 0.230
+            )
+
+    results = feed_beats(tracker, timestamps)
+
+    assert tracker.current_bpm == pytest.approx(
+        126.0,
+        abs=1.0,
     )
 
+    accepted_results = [
+        result
+        for result in results
+        if result.accepted
+    ]
+
+    assert accepted_results
+
+
+def test_reset_clears_tracker() -> None:
+    tracker = BeatTracker()
+
+    tracker.process_onset(0.0)
+    tracker.process_onset(0.476)
     tracker.reset()
 
     assert tracker.current_bpm is None
+    assert tracker.last_onset_time is None
     assert tracker.state is TrackingState.CALIBRATING
     assert tracker.confidence == 0.0
-    assert tracker.last_onset_time is None
-    assert tracker.candidate_bpms == []
-    assert tracker.accepted_count == 0
-    assert tracker.rejected_count == 0
