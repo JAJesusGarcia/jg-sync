@@ -1,13 +1,15 @@
 import { Footer } from "../components/layout/Footer";
 import { Header } from "../components/layout/Header";
 // import { useEngineSimulator } from "../hooks/useEngineSimulator";
-import { useEngineConnection } from "../hooks/useEngineConnection";
+// import { useEngineConnection } from "../hooks/useEngineConnection";
+import { useEngineRuntime } from "../hooks/useEngineRuntime";
 import { useEngineStore } from "../store/engine";
 import { Dashboard } from "./Dashboard";
 
 export function AppShell() {
 //   useEngineSimulator();
-    useEngineConnection();
+    // useEngineConnection();
+    useEngineRuntime();
 
   const {
     bpm,

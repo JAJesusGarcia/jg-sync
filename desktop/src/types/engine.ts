@@ -12,3 +12,7 @@ export interface EngineSnapshot {
   beatDetected: boolean;
   connected: boolean;
 }
+
+export interface EngineError {
+  message: string;
+}
