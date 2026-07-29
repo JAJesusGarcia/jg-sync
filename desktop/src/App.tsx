@@ -1,49 +1,39 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
-
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <main className="flex min-h-screen items-center justify-center bg-[#0B0D10] text-[#F5F7FA]">
+      <section className="w-full max-w-3xl px-8 py-12">
+        <header className="flex items-center justify-between border-b border-[#262C36] pb-5">
+          <div>
+            <p className="text-xs font-semibold tracking-[0.32em] text-[#8E98A8]">
+              LIVE BPM DETECTION
+            </p>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+            <h1 className="mt-2 text-xl font-semibold tracking-[0.16em]">
+              JG SYNC
+            </h1>
+          </div>
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+          <div className="flex items-center gap-2 text-sm font-medium text-[#60A5FA]">
+            <span className="h-2 w-2 rounded-full bg-current" />
+            CALIBRATING
+          </div>
+        </header>
+
+        <div className="flex min-h-[420px] flex-col items-center justify-center">
+          <p className="text-[clamp(5rem,18vw,9rem)] font-semibold leading-none tracking-[-0.07em] tabular-nums">
+            000.00
+          </p>
+
+          <p className="mt-4 text-sm font-medium tracking-[0.3em] text-[#8E98A8]">
+            BPM
+          </p>
+        </div>
+
+        <footer className="flex items-center justify-between border-t border-[#262C36] pt-5 text-xs text-[#8E98A8]">
+          <span>Engine disconnected</span>
+          <span>v0.4 Visual Monitor</span>
+        </footer>
+      </section>
     </main>
   );
 }
