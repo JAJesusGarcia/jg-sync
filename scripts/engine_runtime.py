@@ -11,7 +11,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.audio.capture import AudioCapture  # noqa: E402
-from app.bpm.onset import EnergyOnsetDetector  # noqa: E402
+# from app.bpm.onset import EnergyOnsetDetector  # noqa: E402
+from app.bpm.spectral_onset import (
+    SpectralFluxOnsetDetector,
+)
 from app.bpm.tracker import BeatTracker  # noqa: E402
 from app.engine.protocol import (  # noqa: E402
     EngineState,
@@ -69,7 +72,10 @@ def main() -> int:
         signal.signal(signal.SIGTERM, stop_runtime)
 
     capture = AudioCapture()
-    detector = EnergyOnsetDetector()
+    # detector = EnergyOnsetDetector()
+    detector = SpectralFluxOnsetDetector(
+        block_size=capture.block_size,
+    )
     tracker = BeatTracker()
 
     last_samples = None
@@ -96,6 +102,42 @@ def main() -> int:
                     tracking_result = tracker.process_onset(
                         onset_timestamp
                     )
+                    # print(
+                    #     f"interval={tracking_result.interval:.3f}"
+                    #     if tracking_result.interval
+                    #     else "first beat",
+                    #     file=sys.stderr,
+                    #     flush=True,
+                    # )
+                    # print(
+                    #     f"candidate BPM={60/tracking_result.interval:.2f}"
+                    #     if tracking_result.interval
+                    #     else "",
+                    #     file=sys.stderr,
+                    #     flush=True,
+                    # )
+                    if tracking_result.interval is None:
+                        print(
+                            "onset | first candidate",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                    else:
+                        raw_candidate_bpm = (
+                            60.0 / tracking_result.interval
+                        )
+
+                        print(
+                            (
+                                f"onset"
+                                f" | interval={tracking_result.interval:.3f}s"
+                                f" | raw={raw_candidate_bpm:6.2f} BPM"
+                                f" | accepted={tracking_result.accepted}"
+                                f" | state={tracking_result.state.value}"
+                            ),
+                            file=sys.stderr,
+                            flush=True,
+                        )
 
                     if tracking_result.bpm is not None:
                         current_bpm = tracking_result.bpm
