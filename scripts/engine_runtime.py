@@ -40,7 +40,8 @@ def main() -> int:
             phase = math.sin(tick * 0.35)
 
             emit_snapshot(
-                bpm=128.0 + phase * 0.35,
+                # bpm=128.0 + phase * 0.35,
+                bpm=145.0 + phase * 0.35,
                 confidence=86.0 + phase * 5.0,
                 audio_level=60.0 + phase * 18.0,
                 state=EngineState.TRACKING,
