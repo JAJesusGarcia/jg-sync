@@ -1,3 +1,5 @@
+import { StatusBadge } from "../monitor/StatusBadge";
+
 export function Header() {
   return (
     <header className="flex items-center justify-between border-b border-[#262C36] pb-5">
@@ -11,10 +13,7 @@ export function Header() {
         </h1>
       </div>
 
-      <div className="flex items-center gap-2 text-sm font-medium text-[#60A5FA]">
-        <span className="h-2 w-2 rounded-full bg-current" />
-        CALIBRATING
-      </div>
+      <StatusBadge state="CALIBRATING" />
     </header>
   );
 }
