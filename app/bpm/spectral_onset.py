@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from collections import deque
@@ -22,9 +21,8 @@ class SpectralFluxOnsetDetector:
     Detect musical onsets using positive spectral flux.
 
     Spectral flux measures how much the frequency spectrum increases
-    between consecutive audio blocks. This makes it more sensitive to
-    transients and less dependent on absolute signal volume than a
-    basic energy detector.
+    between consecutive audio blocks. A one-block look-ahead is used
+    so only local spectral-flux peaks are emitted as onsets.
     """
 
     def __init__(
@@ -33,7 +31,7 @@ class SpectralFluxOnsetDetector:
         sensitivity: float = 2.2,
         minimum_threshold: float = 0.003,
         history_size: int = 32,
-        cooldown_blocks: int = 4,
+        cooldown_blocks: int = 8,
         minimum_rms: float = 0.002,
     ) -> None:
         if block_size <= 0:
@@ -46,9 +44,7 @@ class SpectralFluxOnsetDetector:
             raise ValueError("history_size must be at least 4")
 
         if cooldown_blocks < 0:
-            raise ValueError(
-                "cooldown_blocks cannot be negative"
-            )
+            raise ValueError("cooldown_blocks cannot be negative")
 
         self.block_size = block_size
         self.sensitivity = sensitivity
@@ -59,11 +55,18 @@ class SpectralFluxOnsetDetector:
         self.window = np.hanning(block_size).astype(np.float32)
 
         self.previous_spectrum: np.ndarray | None = None
+
         self.flux_history: deque[float] = deque(
             maxlen=history_size,
         )
 
         self.cooldown = 0
+
+        # Previous flux values are retained so an onset is emitted
+        # only when the middle value is a local maximum.
+        self.previous_flux: float | None = None
+        self.previous_threshold: float = minimum_threshold
+        self.previous_rms: float = 0.0
 
     def process(
         self,
@@ -76,15 +79,15 @@ class SpectralFluxOnsetDetector:
         rms = float(
             np.sqrt(
                 np.mean(
-                    np.square(mono_samples)
-                )
-            )
+                    np.square(mono_samples),
+                ),
+            ),
         )
 
         windowed = mono_samples * self.window
 
         spectrum = np.abs(
-            np.fft.rfft(windowed)
+            np.fft.rfft(windowed),
         ).astype(np.float32)
 
         spectrum_sum = float(np.sum(spectrum))
@@ -102,9 +105,7 @@ class SpectralFluxOnsetDetector:
                 energy=rms,
             )
 
-        spectral_difference = (
-            spectrum - self.previous_spectrum
-        )
+        spectral_difference = spectrum - self.previous_spectrum
 
         positive_difference = np.maximum(
             spectral_difference,
@@ -112,7 +113,6 @@ class SpectralFluxOnsetDetector:
         )
 
         flux = float(np.sum(positive_difference))
-
         threshold = self._calculate_threshold()
 
         detected = False
@@ -120,15 +120,24 @@ class SpectralFluxOnsetDetector:
         if self.cooldown > 0:
             self.cooldown -= 1
 
-        elif (
-            rms >= self.minimum_rms
-            and flux > threshold
+        # Detect the previous block only when it is confirmed as a
+        # local maximum relative to the current block.
+        if (
+            self.cooldown == 0
+            and self.previous_flux is not None
+            and self.previous_rms >= self.minimum_rms
+            and self.previous_flux > self.previous_threshold
+            and self.previous_flux >= flux
         ):
             detected = True
             self.cooldown = self.cooldown_blocks
 
         self.flux_history.append(flux)
         self.previous_spectrum = spectrum
+
+        self.previous_flux = flux
+        self.previous_threshold = threshold
+        self.previous_rms = rms
 
         return SpectralOnsetResult(
             detected=detected,
@@ -143,6 +152,10 @@ class SpectralFluxOnsetDetector:
         self.previous_spectrum = None
         self.flux_history.clear()
         self.cooldown = 0
+
+        self.previous_flux = None
+        self.previous_threshold = self.minimum_threshold
+        self.previous_rms = 0.0
 
     def _calculate_threshold(self) -> float:
         """
@@ -164,8 +177,8 @@ class SpectralFluxOnsetDetector:
 
         median_absolute_deviation = float(
             np.median(
-                np.abs(history - history_median)
-            )
+                np.abs(history - history_median),
+            ),
         )
 
         adaptive_threshold = (

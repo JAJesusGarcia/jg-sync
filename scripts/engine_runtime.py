@@ -141,10 +141,13 @@ def main() -> int:
                         flush=True,
                     )
                 else:
-                    raw_candidate_bpm = (
-                        60.0
-                        / tracking_result.interval
-                    )
+                    if tracking_result.interval > 0:
+                        raw_candidate_bpm = (
+                            60.0
+                            / tracking_result.interval
+                        )
+                    else:
+                        raw_candidate_bpm = 0.0
 
                     print(
                         (

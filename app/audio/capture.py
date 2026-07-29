@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import sys
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass
 
@@ -85,15 +86,18 @@ class AudioCapture:
         )
 
         self._queue_lock = threading.Lock()
+
         self._sequence = 0
         self._dropped_blocks = 0
+        self._captured_frames = 0
+        self._audio_clock_start = 0.0
 
     def _audio_callback(
-            self,
-            indata: np.ndarray,
-            frames: int,
-            time,
-            status: sd.CallbackFlags,
+        self,
+        indata: np.ndarray,
+        frames: int,
+        time,
+        status: sd.CallbackFlags,
     ) -> None:
         """Capture and enqueue one incoming audio block."""
 
@@ -140,21 +144,21 @@ class AudioCapture:
             frames / float(self.sample_rate)
         )
 
-        # PortAudio reports when the first input sample entered
-        # the audio system. Using the centre of the block gives
-        # a better representative timestamp for block-based onset
-        # detection.
-        if time is not None:
-            input_time = float(
-                time.inputBufferAdcTime
-            )
-        else:
-            input_time = 0.0
+        if self._sequence == 0:
+            self._audio_clock_start = time_module_perf_counter()
+
+        block_start_timestamp = (
+            self._audio_clock_start
+            + self._captured_frames
+            / float(self.sample_rate)
+        )
 
         block_timestamp = (
-            input_time
+            block_start_timestamp
             + block_duration / 2.0
         )
+
+        self._captured_frames += frames
 
         block = AudioBlock(
             samples=samples,
@@ -221,14 +225,20 @@ class AudioCapture:
 
         self._sequence = 0
         self._dropped_blocks = 0
+        self._captured_frames = 0
+        self._audio_clock_start = 0.0
 
     @property
     def queued_block_count(self) -> int:
+        """Return the number of queued audio blocks."""
+
         with self._queue_lock:
             return len(self._blocks)
 
     @property
     def dropped_blocks(self) -> int:
+        """Return the number of overwritten queue blocks."""
+
         return self._dropped_blocks
 
     @property
@@ -239,3 +249,14 @@ class AudioCapture:
             self.stream is not None
             and self.stream.active
         )
+
+
+def time_module_perf_counter() -> float:
+    """
+    Return a monotonic high-resolution timestamp.
+
+    This helper avoids shadowing the imported time module with the
+    callback's `time` argument required by sounddevice and the tests.
+    """
+
+    return time.perf_counter()

@@ -66,10 +66,11 @@ def test_transient_can_trigger_onset() -> None:
     )
     transient[:32] = 1.0
 
-    result = detector.process(transient)
+    transient_result = detector.process(transient)
+    confirmation_result = detector.process(silence)
 
-    assert result.detected is True
-    assert result.flux > result.threshold
+    assert transient_result.detected is False
+    assert confirmation_result.detected is True
 
 
 def test_constant_tone_is_not_repeatedly_detected() -> None:
