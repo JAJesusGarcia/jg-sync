@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import dataclass
 
 import numpy as np
@@ -49,8 +50,14 @@ class AudioCapture:
     ) -> None:
         """Process each incoming block of audio."""
 
+        # if status:
+        #     print(f"\nAudio warning: {status}")
         if status:
-            print(f"\nAudio warning: {status}")
+            print(
+                f"Audio warning: {status}",
+                file=sys.stderr,
+                flush=True,
+            )
 
         samples = np.asarray(indata, dtype=np.float32)
 
