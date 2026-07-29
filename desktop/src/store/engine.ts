@@ -7,9 +7,9 @@ interface EngineStore extends EngineSnapshot {
 }
 
 const INITIAL_STATE: EngineSnapshot = {
-  bpm: 128.46,
-  confidence: 87,
-  audioLevel: 64,
+  bpm: 0,
+  confidence: 0,
+  audioLevel: 0,
   state: "CALIBRATING",
   beatDetected: true,
   connected: false,
