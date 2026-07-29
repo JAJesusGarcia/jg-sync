@@ -11,6 +11,7 @@ export interface EngineSnapshot {
   state: EngineState;
   beatDetected: boolean;
   connected: boolean;
+    timestamp?: number;
 }
 
 export interface EngineError {
